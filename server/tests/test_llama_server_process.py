@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -14,6 +15,26 @@ def _reset_process_state():
     process._loaded_gguf = None
     process._loaded_config_key = None
     process._startup_warnings.clear()
+    process._last_activity = time.monotonic()
+
+
+def test_idle_server_stops_after_timeout(tmp_path: Path):
+    _reset_process_state()
+    gguf = tmp_path / "model.gguf"
+    gguf.write_bytes(b"x")
+
+    fake_proc = Mock()
+    fake_proc.poll.return_value = None
+
+    process._process = fake_proc
+    process._loaded_gguf = gguf.resolve()
+    process._loaded_config_key = "{}"
+    process._last_activity = 0.0
+
+    with patch("server.backend.llama_server.process.time.monotonic", return_value=60.0):
+        assert process.stop_if_idle(timeout_seconds=10.0) is True
+
+    fake_proc.send_signal.assert_called_once_with(process.signal.SIGTERM)
 
 
 def test_is_server_ready_requires_health_ok():
@@ -171,9 +192,13 @@ def _hf_cache_layout(tmp_path: Path) -> tuple[Path, Path]:
         ("0a270ec9fe6b34f4a0d33992b6135117b484ebc4766ab76b51d4ae8c457e4c42", "gemma-4-12b-it-Q4_K_M.gguf"),
         ("145db9094bc0f85f1701e255a2ed216dcc9800fc8bc8631ad00905b456bd451b", "mtp-gemma-4-12b-it.gguf"),
     ):
-        (blobs / blob_sha).write_bytes(b"x")
+        blob_path = blobs / blob_sha
+        blob_path.write_bytes(b"x")
         link = snapshot / filename
-        link.symlink_to(Path("../../blobs") / blob_sha)
+        try:
+            link.symlink_to(Path("../../blobs") / blob_sha)
+        except (NotImplementedError, OSError):
+            link.write_bytes(blob_path.read_bytes())
         links.append(link)
 
     return links[0], links[1]

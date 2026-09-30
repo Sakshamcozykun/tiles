@@ -24,18 +24,75 @@ logger = logging.getLogger("app")
 _process: subprocess.Popen[bytes] | None = None
 _loaded_gguf: Path | None = None
 _loaded_config_key: str | None = None
+_last_activity = time.monotonic()
 # Serializes ensure_running so concurrent requests can't double-start the server.
 _ensure_lock = threading.Lock()
 # Warnings recorded while starting/restarting llama-server (e.g. MTP
 # requested but no MTP GGUF on disk). ensure_running drains them inside
-# _ensure_lock and returns them to its caller so the CLI can surface
+# _ensure_lock and returns them to the caller so the CLI can surface
 # them to the user.
 _startup_warnings: list[str] = []
+_idle_monitor_thread: threading.Thread | None = None
+_idle_monitor_stop = threading.Event()
+
+DEFAULT_IDLE_TIMEOUT_SECONDS = 300.0
 
 
 def _record_warning(message: str, *args: Any) -> None:
     logger.warning(message, *args)
     _startup_warnings.append(message % args if args else message)
+
+
+def touch_activity() -> None:
+    """Update the last successful activity timestamp for idle shutdown."""
+    global _last_activity
+    _last_activity = time.monotonic()
+
+
+def stop_if_idle(timeout_seconds: float = DEFAULT_IDLE_TIMEOUT_SECONDS) -> bool:
+    """Stop llama-server when it has been idle longer than the configured timeout."""
+    global _process, _loaded_gguf, _loaded_config_key
+    if _process is None:
+        _loaded_gguf = None
+        _loaded_config_key = None
+        return False
+    if _process.poll() is not None:
+        _process = None
+        _loaded_gguf = None
+        _loaded_config_key = None
+        return False
+    idle_seconds = time.monotonic() - _last_activity
+    if idle_seconds < timeout_seconds:
+        return False
+    logger.info(
+        "llama-server idle for %.0fs; shutting it down to free resources",
+        idle_seconds,
+    )
+    stop()
+    return True
+
+
+def start_idle_monitor(timeout_seconds: float = DEFAULT_IDLE_TIMEOUT_SECONDS) -> None:
+    """Run a daemon thread that unloads the model after prolonged inactivity."""
+    global _idle_monitor_thread
+    if _idle_monitor_thread is not None and _idle_monitor_thread.is_alive():
+        return
+    _idle_monitor_stop.clear()
+
+    def _monitor() -> None:
+        while not _idle_monitor_stop.wait(10.0):
+            stop_if_idle(timeout_seconds=timeout_seconds)
+
+    _idle_monitor_thread = threading.Thread(
+        target=_monitor,
+        name="tiles-llama-idle-monitor",
+        daemon=True,
+    )
+    _idle_monitor_thread.start()
+
+
+def stop_idle_monitor() -> None:
+    _idle_monitor_stop.set()
 
 
 def take_warnings() -> list[str]:
@@ -295,6 +352,7 @@ def ensure_running(gguf_path: Path, llama_config: dict[str, Any]) -> list[str]:
             and _loaded_gguf == resolved_gguf
             and _loaded_config_key == key
         ):
+            touch_activity()
             if is_server_ready():
                 return []
             wait_until_ready(_process)
@@ -340,5 +398,6 @@ def ensure_running(gguf_path: Path, llama_config: dict[str, Any]) -> list[str]:
             stderr_log.close()
         _loaded_gguf = resolved_gguf
         _loaded_config_key = key
+        touch_activity()
         wait_until_ready(_process)
         return take_warnings()
