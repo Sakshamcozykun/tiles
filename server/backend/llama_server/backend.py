@@ -57,6 +57,7 @@ def get_or_load_model(
     model_cache_path: str | None = None,
     verbose: bool = True,
 ) -> LlamaServerRunner:
+    process.touch_activity()
     llama_config = get_llama_config()
 
     try:
