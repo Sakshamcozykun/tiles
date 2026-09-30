@@ -5,6 +5,10 @@ The format is based on https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+### Fixed
+
+- The inference server no longer keeps a loaded model resident indefinitely when the CLI exits unexpectedly. An idle monitor shuts down the `llama-server` process after five minutes without inference activity, releasing the memory and GPU it was holding. #[165](https://github.com/tilesprivacy/tiles/issues/165)
+
 ## [0.4.19] - 2026-08-30
 
 ### Added
