@@ -629,7 +629,7 @@ async fn wait_until_server_is_up() {
 }
 
 pub fn get_default_modelfile(provider: impl ConfigProvider) -> Result<PathBuf> {
-    let path = provider.get_lib_dir()?.join("modelfiles/gemma-4-12b-gguf");
+    let path = provider.get_lib_dir()?.join("modelfiles/qwen-0.8b-gguf");
     Ok(path)
 }
 
@@ -1323,7 +1323,7 @@ mod tests {
     fn default_modelfile_uses_platform_default() {
         let path =
             get_default_modelfile(DefaultProvider).expect("default modelfile should resolve");
-        assert!(path.ends_with("modelfiles/gemma-4-12b-gguf"));
+        assert!(path.ends_with("modelfiles/qwen-0.8b-gguf"));
     }
 
     #[test]

@@ -290,8 +290,7 @@ mod tests {
         };
 
         fs::create_dir(mock_provider.tmp_path.join("modelfiles")).unwrap();
-        let mut f =
-            File::create(mock_provider.tmp_path.join("modelfiles/gemma-4-12b-gguf")).unwrap();
+        let mut f = File::create(mock_provider.tmp_path.join("modelfiles/qwen-0.8b-gguf")).unwrap();
         f.write_all("FROM llama3.2\nSYSTEM hello\n".as_bytes())
             .unwrap();
         let res = do_create_session(Arc::new(state), create_test_agent, mock_provider).await;

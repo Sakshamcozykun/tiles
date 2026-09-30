@@ -5,6 +5,14 @@ The format is based on https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+### Changed
+
+- The default model is now `Qwen3.5-0.8B` instead of `Gemma-4-12B`, cutting the default download from roughly 6.6 GB to about 0.5 GB. Gemma remains selectable as before.
+
+### Fixed
+
+- The inference server no longer keeps a loaded model resident indefinitely when the CLI exits unexpectedly. An idle monitor shuts down the `llama-server` process after five minutes without inference activity, releasing the memory and GPU it was holding. #[165](https://github.com/tilesprivacy/tiles/issues/165)
+
 ## [0.4.19] - 2026-08-30
 
 ### Added

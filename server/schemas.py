@@ -181,7 +181,7 @@ class CFunctionCallOutputItemParam(BaseModel):
 
 
 class ResponsesRequest(BaseModel):
-    model: str = "unsloth/gemma-4-12b-it-GGUF"
+    model: str = "unsloth/Qwen3.5-0.8B-GGUF"
     input: (
         str
         | list[
