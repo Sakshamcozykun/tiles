@@ -7,6 +7,7 @@ import uvicorn
 from .api import app
 import logging
 
+from .backend.llama_server import process as llama_process
 from .config import PORT
 from fastapi import Request
 from . import runtime
@@ -49,6 +50,7 @@ def get_backend():
     return llama_server
 
 runtime.backend = get_backend()
+llama_process.start_idle_monitor()
 
 
 def _stop_backend_server() -> None:
